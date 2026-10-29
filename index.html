@@ -438,8 +438,8 @@ body[data-view="screen"] .credit{font-size:14px}
   function renderPromo(){
     const has=promos.length>0, p=has?promos[promoIdx%promos.length]:null;
     const inner=$("promoInner");inner.classList.remove("fade");void inner.offsetWidth;inner.classList.add("fade");
-    $("pvTitle").textContent=p?p.title:"歡迎使用 OSCE 站位計時器";
-    $("pvDetail").textContent=p?(p.detail||""):"活動宣傳會顯示在這裡，可由主控者在「設定」中新增。";
+    $("pvTitle").textContent=p?p.title:(standalone?"中國醫藥大學附設醫院 教學部":"歡迎使用 OSCE 站位計時器");
+    $("pvDetail").textContent=p?(p.detail||""):(standalone?"OSCE 站位計時器，考場專用。祝各位考生順利！":"活動宣傳會顯示在這裡，可由主控者在「設定」中新增。");
     $("pvWhen").textContent=p?(p.when||""):"";
     const d=$("pdots");d.textContent="";
     if(promos.length>1)promos.forEach((_,i)=>{const e=document.createElement("i");if(i===promoIdx%promos.length)e.className="on";d.appendChild(e);});
@@ -496,7 +496,7 @@ body[data-view="screen"] .credit{font-size:14px}
         },()=>{});
       }
     }catch(e){db=null;canWrite=false;}
-    dbReady=true;applyView();
+    dbReady=true;renderPromo();applyView();
   })();
 
   renderPromo();applyView();
