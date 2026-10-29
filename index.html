@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="中國醫藥大學附設醫院 教學部 OSCE 站位計時器（向日葵版）">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>OSCE 站位計時器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Huninn&family=Noto+Sans+TC:wght@400;500;700&family=Nunito:wght@700;800&display=swap">
+<style>
+/* Layout: 向日葵微動態。上方單位與模式切換，中央大字倒數加花瓣進度，花瓣隨時間逐片凋落；大螢幕模式改為左右兩欄，右側輪播活動宣傳 */
+:root{
+  --bg:#fff7dc; --surface:#fffdf5; --ink:#3a2a12; --muted:#7a6447; --line:#efdfb0;
+  --sun:#f2b705; --sun-deep:#d99a00; --seed:#5a3a1a; --leaf:#3d7a2c; --leaf-ink:#ffffff;
+  --warn:#c45a07; --warn-soft:#ffe9cc;
+  --alarm:#c62828; --alarm-stage:#b3261e;
+  --stage:var(--surface); --digit:var(--ink);
+  --f-display:"Huninn","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:"Nunito","Noto Sans TC",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1b160c; --surface:#262012; --ink:#f8ecd2; --muted:#c2ad86; --line:#3b3119;
+  --sun:#ffc93c; --sun-deep:#f2b705; --seed:#e0b57a; --leaf:#8cc56a; --leaf-ink:#132108;
+  --warn:#ffa24a; --warn-soft:#3b2810; --alarm:#ff6b5e; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#1b160c; --surface:#262012; --ink:#f8ecd2; --muted:#c2ad86; --line:#3b3119;
+  --sun:#ffc93c; --sun-deep:#f2b705; --seed:#e0b57a; --leaf:#8cc56a; --leaf-ink:#132108;
+  --warn:#ffa24a; --warn-soft:#3b2810; --alarm:#ff6b5e; color-scheme:dark;
+}
+html,body{height:100%}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{min-height:100%;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-block:12px}
+
+/* 頂部：單位、向日葵圖示、模式切換 */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.sunicon{width:40px;height:40px;flex:none;transform-origin:50% 90%;animation:sway 4.5s ease-in-out infinite}
+.sunicon .head{transform-origin:20px 20px}
+body[data-run="running"] .sunicon .head{animation:spin 30s linear infinite}
+@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.org{font-family:var(--f-display);font-size:16px;line-height:1.25}
+.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--muted)}
+.modes{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.modes button{border:0;background:transparent;color:var(--muted);font:500 14px var(--f-ui);padding:7px 14px;border-radius:999px;cursor:pointer}
+.modes button[aria-selected="true"]{background:var(--sun);color:#3a2a12}
+.syncbar{font-size:13px;line-height:1.5;padding:8px 12px;border-radius:12px;background:var(--surface);border:1px dashed var(--sun-deep);color:var(--ink)}
+
+/* 站位資訊 */
+.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.station{min-width:0}
+.st-line{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.st-no{font-family:var(--f-display);font-size:26px}
+.st-name{font-size:18px;font-weight:700;overflow-wrap:anywhere}
+.student{margin-top:4px;font-size:15px;color:var(--muted)}
+.student b{color:var(--ink)}
+.icon-btn{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:8px 14px;font:500 14px var(--f-ui);cursor:pointer}
+
+/* 計時舞台 */
+.body{display:flex;flex-direction:column;gap:12px}
+.stage{min-height:250px;background:var(--stage);border-radius:24px;border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:22px 16px;
+  transition:background .4s ease,border-color .4s ease;min-width:0}
+.chip{font-size:14px;font-weight:700;padding:5px 16px;border-radius:999px;background:var(--bg);color:var(--muted);letter-spacing:.06em}
+.digits{font-family:var(--f-num);font-weight:800;font-variant-numeric:tabular-nums;line-height:1;
+  font-size:clamp(78px,25vw,140px);color:var(--digit);letter-spacing:-.01em;transition:color .4s ease}
+.over{font-family:var(--f-num);font-size:18px;font-weight:700;color:var(--alarm);min-height:1.3em}
+.petals{display:flex;gap:4px;justify-content:center;flex-wrap:nowrap;width:100%;max-width:420px}
+.petal{flex:1;max-width:22px;aspect-ratio:1/1.9;border-radius:50% 50% 50% 50% / 62% 62% 38% 38%;
+  background:var(--sun);transition:opacity .9s ease,transform .9s ease,background .4s ease;transform-origin:50% 100%}
+.petal:nth-child(odd){transform:rotate(-6deg)}
+.petal:nth-child(even){transform:rotate(6deg)}
+.petal.off{opacity:.16;transform:translateY(6px) rotate(24deg)}
+.petal.mark{box-shadow:0 0 0 2px var(--warn)}
+.scale{width:100%;max-width:420px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-family:var(--f-num)}
+
+body[data-run="running"] .chip{background:var(--leaf);color:var(--leaf-ink)}
+body[data-run="warn"]{--stage:var(--warn-soft);--digit:var(--warn)}
+body[data-run="warn"] .stage{border-color:var(--warn)}
+body[data-run="warn"] .petal:not(.off){background:var(--warn)}
+body[data-run="warn"] .chip{background:var(--warn);color:var(--surface)}
+body[data-run="done"]{--stage:var(--alarm-stage);--digit:#ffffff}
+body[data-run="done"] .stage{border-color:var(--alarm-stage)}
+body[data-run="done"] .chip{background:#ffffff;color:#b3261e}
+body[data-run="done"] .over{color:#ffffff}
+body[data-run="done"] .scale{color:#ffe1dc}
+body[data-run="done"] .digits{animation:pulse 1s steps(2) infinite}
+@keyframes pulse{50%{opacity:.55}}
+
+/* 宣傳區 */
+.promo{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:14px 16px;display:grid;gap:4px;min-width:0;position:relative;overflow:hidden}
+.promo .tag{font-size:12px;letter-spacing:.12em;color:var(--sun-deep);font-weight:700}
+.promo .p-title{font-family:var(--f-display);font-size:18px;line-height:1.35;overflow-wrap:anywhere}
+.promo .p-detail{font-size:14px;color:var(--muted);line-height:1.55;overflow-wrap:anywhere}
+.promo .p-when{font-size:13px;color:var(--ink);font-weight:500}
+.promo .dots{display:flex;gap:6px;margin-top:6px}
+.promo .dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.promo .dots i.on{background:var(--sun-deep)}
+.promo .fade{animation:rise .6s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.bigsun{display:none}
+
+/* 控制鍵 */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:18px;padding:14px 10px;font:700 18px var(--f-ui);cursor:pointer;min-height:56px}
+.btn:focus-visible,.icon-btn:focus-visible,.modes button:focus-visible,input:focus-visible,.unlock:focus-visible{outline:3px solid var(--sun-deep);outline-offset:2px}
+.primary{grid-column:1/-1;background:var(--leaf);color:var(--leaf-ink);font-size:22px;min-height:70px}
+.primary.is-pause{background:var(--ink);color:var(--bg)}
+.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.hint{font-size:12px;color:var(--muted);text-align:center;line-height:1.6;margin:0}
+.unlock{border:2px dashed var(--sun-deep);background:var(--surface);color:var(--ink);border-radius:16px;padding:12px;font:700 16px var(--f-ui);cursor:pointer}
+.credit{font-size:12px;color:var(--muted);text-align:center;padding-top:4px}
+.credit b{color:var(--ink);font-weight:500}
+
+/* 設定面板 */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;gap:12px}
+.sheet h2{margin:0;font-size:16px;font-family:var(--f-display);font-weight:400}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+input{font:500 16px var(--f-ui);padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.row-check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.row-check input{width:auto}
+.sheet .btn{min-height:48px;font-size:16px}
+.plist{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.plist li{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:12px;background:var(--bg);font-size:14px}
+.plist li span{min-width:0;overflow-wrap:anywhere}
+.plist button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:6px 10px;font:500 13px var(--f-ui);cursor:pointer}
+.plist button.confirm{background:var(--alarm);color:#fff;border-color:var(--alarm)}
+.err{font-size:13px;color:var(--alarm);min-height:1em}
+.divider{height:1px;background:var(--line)}
+
+/* 大螢幕模式 */
+body[data-view="screen"] .app{max-width:1400px}
+body[data-view="screen"] .org{font-size:22px}
+body[data-view="screen"] .sunicon{width:56px;height:56px}
+body[data-view="screen"] .digits{font-size:clamp(96px,17vw,300px)}
+body[data-view="screen"] .petals{max-width:720px}
+body[data-view="screen"] .scale{max-width:720px;font-size:14px}
+body[data-view="screen"] .chip{font-size:18px}
+body[data-view="screen"] .st-no{font-size:34px}
+body[data-view="screen"] .st-name{font-size:26px}
+body[data-view="screen"] .student{font-size:20px}
+body[data-view="screen"] .promo{padding:24px 28px;gap:8px}
+body[data-view="screen"] .promo .p-title{font-size:28px}
+body[data-view="screen"] .promo .p-detail{font-size:18px}
+body[data-view="screen"] .promo .p-when{font-size:17px}
+body[data-view="screen"] .promo .tag{font-size:14px}
+body[data-view="screen"] .bigsun{display:block;width:120px;height:120px;margin-bottom:6px}
+body[data-view="screen"] .bigsun .head{transform-origin:60px 60px;animation:spin 60s linear infinite}
+body[data-view="screen"] .credit{font-size:14px}
+@media (min-width:900px){
+  body[data-view="screen"] .body{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:20px;align-items:stretch}
+  body[data-view="screen"] .stage{min-height:60vh}
+  body[data-view="screen"] .promo{align-content:center}
+  body[data-view="screen"] .controls{grid-template-columns:2fr 1fr 1fr}
+  body[data-view="screen"] .primary{grid-column:auto}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="sunicon" viewBox="0 0 40 40" aria-hidden="true">
+        <g class="head" id="iconPetals"></g>
+        <circle cx="20" cy="20" r="7" fill="var(--seed)"></circle>
+      </svg>
+      <div>
+        <div class="org">中國醫藥大學附設醫院 教學部</div>
+        <div class="eyebrow">OSCE 站位計時</div>
+      </div>
+    </div>
+    <nav class="modes" role="tablist" aria-label="使用模式">
+      <button role="tab" data-view="solo" aria-selected="true">單機</button>
+      <button role="tab" data-view="sync" aria-selected="false">同步</button>
+      <button role="tab" data-view="screen" aria-selected="false">大螢幕</button>
+    </nav>
+  </header>
+
+  <div class="syncbar" id="syncbar" role="status" hidden></div>
+
+  <section class="head">
+    <div class="station">
+      <div class="st-line"><span class="st-no" id="vStation">第 3 站</span><span class="st-name" id="vName">腹部身體檢查</span></div>
+      <div class="student">考生 <b id="vStudent">學員 A</b>　<span id="vRound">第 1 位</span></div>
+    </div>
+    <button class="icon-btn" id="btnSettings" aria-expanded="false" aria-controls="sheet">設定</button>
+  </section>
+
+  <section class="sheet" id="sheet" hidden>
+    <h2 id="sheetTitle">本站設定</h2>
+    <div class="grid2">
+      <label for="inStation">站號<input id="inStation" type="number" min="1" inputmode="numeric" value="3"></label>
+      <label for="inStudent">學員代號<input id="inStudent" type="text" value="A"></label>
+    </div>
+    <label for="inName">站名<input id="inName" type="text" value="腹部身體檢查"></label>
+    <div class="grid2">
+      <label for="inMin">每站時間（分鐘）<input id="inMin" type="number" min="1" max="60" inputmode="numeric" value="8"></label>
+      <label for="inWarn">提醒（剩幾分鐘）<input id="inWarn" type="number" min="0" max="30" inputmode="numeric" value="1"></label>
+    </div>
+    <label class="row-check" for="inVibe"><input id="inVibe" type="checkbox" checked>支援的手機同時震動</label>
+    <button class="btn primary" id="btnApply">套用並重設計時</button>
+
+    <div id="promoAdmin" hidden>
+      <div class="divider"></div>
+      <h2 style="margin-top:12px">活動宣傳</h2>
+      <p class="hint" style="text-align:left">新增後會在所有裝置的宣傳區與大螢幕輪播。只有你與編輯者能新增或刪除。</p>
+      <ul class="plist" id="plist"></ul>
+      <label for="pTitle">標題（必填）<input id="pTitle" type="text" maxlength="40" placeholder="例如：超音波工作坊開放報名"></label>
+      <label for="pDetail">說明<input id="pDetail" type="text" maxlength="80" placeholder="例如：限 PGY 學員，名額 20 人"></label>
+      <label for="pWhen">日期或時間<input id="pWhen" type="text" maxlength="30" placeholder="例如：11/20（四）13:30"></label>
+      <div class="err" id="pErr"></div>
+      <button class="btn ghost" id="btnAddPromo">新增宣傳</button>
+    </div>
+  </section>
+
+  <div class="body">
+    <main class="stage">
+      <svg class="bigsun" viewBox="0 0 120 120" aria-hidden="true">
+        <g class="head" id="bigPetals"></g>
+        <circle cx="60" cy="60" r="20" fill="var(--seed)"></circle>
+      </svg>
+      <span class="chip" id="chip" aria-live="polite">準備中</span>
+      <div class="digits" id="digits" role="timer" aria-live="off">08:00</div>
+      <div class="over" id="over"></div>
+      <div class="petals" id="petals" aria-hidden="true"></div>
+      <div class="scale" aria-hidden="true"><span id="sStart">08:00</span><span id="sWarn">剩 01:00 響鈴</span><span>00:00</span></div>
+    </main>
+    <aside class="promo" id="promo" aria-label="活動宣傳">
+      <div id="promoInner" class="fade">
+        <div class="tag">教學部近期活動</div>
+        <div class="p-title" id="pvTitle">歡迎使用 OSCE 站位計時器</div>
+        <div class="p-detail" id="pvDetail">活動宣傳會顯示在這裡，可由主控者在「設定」中新增。</div>
+        <div class="p-when" id="pvWhen"></div>
+      </div>
+      <div class="dots" id="pdots"></div>
+    </aside>
+  </div>
+
+  <div class="controls" id="controls">
+    <button class="btn primary" id="btnMain">開始</button>
+    <button class="btn ghost" id="btnReset">重設</button>
+    <button class="btn ghost" id="btnNext">下一位學員</button>
+  </div>
+  <button class="unlock" id="unlock" hidden>點一下啟用鈴聲與螢幕常亮</button>
+  <p class="hint" id="hint">計時期間螢幕會保持開啟。手機切到靜音時鈴聲可能不響，請開啟音量或使用震動。</p>
+  <footer class="credit">中國醫藥大學附設醫院 教學部｜系統設計：<b>陳巧錚</b></footer>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const PETALS=16;
+
+  /* 向日葵圖示花瓣 */
+  function drawSun(g,c,len,w,n){
+    let s="";
+    for(let i=0;i<n;i++){s+='<ellipse cx="'+c+'" cy="'+(c-len)+'" rx="'+w+'" ry="'+(len*0.55)+'" fill="var(--sun)" transform="rotate('+(i*360/n)+' '+c+' '+c+')"></ellipse>';}
+    g.innerHTML=s;
+  }
+  drawSun($("iconPetals"),20,12,3.6,14);
+  drawSun($("bigPetals"),60,36,10,16);
+  const petalBox=$("petals");
+  for(let i=0;i<PETALS;i++){const p=document.createElement("span");p.className="petal";petalBox.appendChild(p);}
+  const petalEls=[...petalBox.children];
+
+  /* 本機設定 */
+  const cfg={station:3,name:"腹部身體檢查",student:"A",min:8,warn:1,vibe:true,round:1};
+  try{const s=JSON.parse(localStorage.getItem("osceTimerCfg")||"null");if(s&&typeof s==="object")Object.assign(cfg,s);}catch(e){}
+  function clean(c){
+    c.station=Math.max(1,parseInt(c.station)||3);
+    c.name=String(c.name??"").slice(0,40);
+    c.student=String(c.student||"A").slice(0,10);
+    c.min=Math.min(60,Math.max(1,parseFloat(c.min)||8));
+    c.warn=Math.min(c.min-0.5,Math.max(0,parseFloat(c.warn)||0));
+    c.round=Math.max(1,parseInt(c.round)||1);
+    c.vibe=c.vibe!==false;return c;
+  }
+  clean(cfg);
+  function saveCfg(){try{localStorage.setItem("osceTimerCfg",JSON.stringify(cfg));}catch(e){}}
+  const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  function idleFrom(c){return {station:c.station,name:c.name,student:c.student,round:c.round,min:c.min,warn:c.warn,state:"idle",endAt:null,remainMs:c.min*60000,runId:rid()};}
+
+  let soloS=idleFrom(cfg);
+  let standalone=false; /* 不在 Claude 內開啟（例如 GitHub 或 Vercel 網址）時，大螢幕改由本機操作，不提供同步 */
+  let remoteS=null, db=null, sessRef=null, canWrite=false, dbReady=false, writeChain=Promise.resolve();
+  let promos=[], promoIdx=0;
+  let view=["sync","screen"].includes(location.hash.slice(1))?location.hash.slice(1):"solo";
+
+  function cur(){return (view==="solo"||standalone)?soloS:(remoteS||idleFrom(cfg));}
+  function leftOf(S){return S.state==="running"?S.endAt-Date.now():S.remainMs;}
+
+  /* 狀態變更：單機改本機，同步寫入共享資料（一次一筆，依序送出） */
+  function commit(n){
+    if(view==="solo"||standalone){soloS=n;Object.assign(cfg,{station:n.station,name:n.name,student:n.student,round:n.round,min:n.min,warn:n.warn});saveCfg();draw();return;}
+    if(!canWrite||!sessRef)return;
+    remoteS=n;draw();
+    writeChain=writeChain.then(()=>sessRef.set(n)).catch(e=>{setSync("同步寫入失敗，請稍後再按一次。（"+(e&&e.code||"錯誤")+"）");});
+  }
+  const act={
+    start(){const S=cur();unlockAudio();commit({...S,state:"running",endAt:Date.now()+Math.max(0,S.remainMs)});},
+    pause(){const S=cur();commit({...S,state:"paused",remainMs:S.endAt-Date.now(),endAt:null});},
+    reset(){const S=cur();commit({...S,state:"idle",endAt:null,remainMs:S.min*60000,runId:rid()});},
+    next(){const S=cur();let st=S.student;
+      if(/^[A-Ya-y]$/.test(st))st=String.fromCharCode(st.charCodeAt(0)+1);else if(/^\d+$/.test(st))st=String(+st+1);
+      commit({...S,student:st,round:S.round+1,state:"idle",endAt:null,remainMs:S.min*60000,runId:rid()});}
+  };
+
+  /* 鈴聲與震動 */
+  let actx=null;
+  function unlockAudio(){
+    try{if(!actx)actx=new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();}catch(e){}
+    $("unlock").hidden=true;keepAwake();
+  }
+  function bell(n){
+    if(actx){
+      try{if(actx.state==="suspended")actx.resume();}catch(e){}
+      const t0=actx.currentTime;
+      for(let i=0;i<n;i++){
+        const o=actx.createOscillator(),g=actx.createGain();
+        o.type="triangle";o.frequency.value=i%2?880:1175;
+        const t=t0+i*0.42;
+        g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.45,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
+        o.connect(g).connect(actx.destination);o.start(t);o.stop(t+0.36);
+      }
+    }
+    if(cfg.vibe){try{navigator.vibrate&&navigator.vibrate(Array(n).fill([300,150]).flat());}catch(e){}}
+  }
+
+  /* 螢幕常亮：計時中或大螢幕模式 */
+  let wake=null, wantAwake=false;
+  async function keepAwake(){
+    try{if(wake||!("wakeLock" in navigator))return;const l=await navigator.wakeLock.request("screen");
+      if(wantAwake){wake=l;l.addEventListener&&l.addEventListener("release",()=>{wake=null;});}else l.release();}catch(e){}
+  }
+  function releaseAwake(){try{wake&&wake.release();}catch(e){}wake=null;}
+
+  /* 畫面 */
+  const fmt=ms=>{const t=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0");};
+  const fmtOver=ms=>{const t=Math.floor(ms/1000);return Math.floor(t/60)+":"+String(t%60).padStart(2,"0");};
+  const setText=(id,v)=>{const el=$(id);if(el.textContent!==v)el.textContent=v;};
+  let seenRun=null,warned=false,doneFired=false,lastRun="";
+
+  function draw(){
+    const S=cur(), left=leftOf(S), total=S.min*60000, warnMs=S.warn*60000;
+    if(S.runId!==seenRun){seenRun=S.runId;warned=S.warn>0&&left<=warnMs;doneFired=left<=0;}
+    let run="idle",label="準備中";
+    if(S.state==="paused"){run="paused";label="已暫停";}
+    if(S.state==="running"){
+      if(left<=0){run="done";label="時間到";if(!doneFired){doneFired=true;bell(4);}}
+      else if(S.warn>0&&left<=warnMs){run="warn";label="剩 "+S.warn+" 分鐘";if(!warned){warned=true;bell(2);}}
+      else {run="running";label="進行中";}
+    }else if(left<=0&&S.state!=="idle"){run="done";label="時間到";}
+    if(view!=="solo"&&!standalone&&!remoteS&&dbReady)label=canWrite?"準備中（按開始即同步）":"等待主控開始";
+    if(document.body.dataset.run!==run)document.body.dataset.run=run;
+    setText("chip",label);
+    setText("digits",left>0?fmt(left):"00:00");
+    setText("over",left<=0&&S.state!=="idle"?"超時 "+fmtOver(-left):"");
+    const frac=Math.max(0,Math.min(1,left/total)), keep=Math.ceil(frac*PETALS);
+    const markIdx=S.warn>0?Math.ceil(S.warn/S.min*PETALS)-1:-1;
+    petalEls.forEach((p,i)=>{p.classList.toggle("off",i>=keep);p.classList.toggle("mark",i===markIdx);});
+    setText("vStation","第 "+S.station+" 站");setText("vName",S.name||"未命名站");
+    setText("vStudent","學員 "+(S.student||"?"));setText("vRound","第 "+S.round+" 位");
+    setText("sStart",fmt(total));setText("sWarn",S.warn>0?"剩 "+fmt(warnMs)+" 響鈴":"");
+    const m=$("btnMain"),ml=S.state==="running"?"暫停":S.state==="paused"?"繼續":"開始";
+    setText("btnMain",ml);m.classList.toggle("is-pause",S.state==="running");
+    const awake=view==="screen"||S.state==="running";
+    if(awake!==wantAwake){wantAwake=awake;awake?keepAwake():releaseAwake();}
+  }
+
+  /* 模式切換 */
+  function setSync(t){const b=$("syncbar");b.textContent=t;b.hidden=!t;}
+  function applyView(){
+    if(standalone&&view==="sync")view="solo";
+    document.querySelector('.modes [data-view="sync"]').hidden=standalone;
+    document.body.dataset.view=view;
+    document.querySelectorAll(".modes button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===view)));
+    const control=view==="solo"||canWrite||standalone;
+    $("controls").hidden=!control;
+    $("btnSettings").hidden=!control;
+    if(!control){$("sheet").hidden=true;}
+    $("promoAdmin").hidden=!(canWrite&&db);
+    $("sheetTitle").textContent=view==="solo"?"本站設定（僅此裝置）":"全場設定（所有同步裝置）";
+    $("unlock").hidden=view==="solo"||standalone||!!(actx&&actx.state==="running");
+    $("hint").hidden=view==="screen";
+    if(view==="solo"||standalone)setSync("");
+    else if(!dbReady)setSync("正在連線同步資料…");
+    else if(!db)setSync("此裝置無法同步：需登入 Claude 帳號開啟此頁才能跟隨主控。可改用「單機」模式各自計時。");
+    else if(canWrite)setSync("同步中｜你是主控：所有開啟此頁「同步」或「大螢幕」的裝置會跟著你的操作倒數與響鈴。");
+    else setSync("同步中｜跟隨主控倒數與響鈴，僅主控可操作。各裝置時鐘誤差通常在 1 秒內。");
+    syncInputs();draw();
+  }
+  document.querySelectorAll(".modes button").forEach(b=>b.addEventListener("click",()=>{
+    view=b.dataset.view;
+    try{history.replaceState(null,"",view==="solo"?location.pathname+location.search:"#"+view);}catch(e){location.hash=view==="solo"?"":view;}
+    applyView();
+  }));
+  window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);view=["sync","screen"].includes(h)?h:"solo";applyView();});
+
+  /* 設定面板 */
+  function syncInputs(){
+    const S=cur();
+    $("inStation").value=S.station;$("inName").value=S.name;$("inStudent").value=S.student;
+    $("inMin").value=S.min;$("inWarn").value=S.warn;$("inVibe").checked=cfg.vibe;
+  }
+  $("btnSettings").addEventListener("click",()=>{
+    const open=$("sheet").hidden;if(open)syncInputs();
+    $("sheet").hidden=!open;$("btnSettings").setAttribute("aria-expanded",String(open));$("btnSettings").textContent=open?"收合":"設定";
+  });
+  $("btnApply").addEventListener("click",()=>{
+    const c=clean({station:$("inStation").value,name:$("inName").value.trim(),student:$("inStudent").value.trim(),min:$("inMin").value,warn:$("inWarn").value,vibe:$("inVibe").checked,round:1});
+    cfg.vibe=c.vibe;saveCfg();
+    commit(idleFrom(c));
+    $("sheet").hidden=true;$("btnSettings").textContent="設定";$("btnSettings").setAttribute("aria-expanded","false");
+  });
+
+  $("btnMain").addEventListener("click",()=>cur().state==="running"?act.pause():act.start());
+  $("btnReset").addEventListener("click",act.reset);
+  $("btnNext").addEventListener("click",act.next);
+  $("unlock").addEventListener("click",unlockAudio);
+  document.addEventListener("keydown",e=>{
+    if(e.code!=="Space"||e.target.closest("input,button"))return;
+    if(view!=="solo"&&!canWrite)return;
+    e.preventDefault();cur().state==="running"?act.pause():act.start();
+  });
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible"){if(wantAwake)keepAwake();try{actx&&actx.state==="suspended"&&actx.resume();}catch(e){}draw();}
+  });
+
+  /* 宣傳輪播 */
+  function renderPromo(){
+    const has=promos.length>0, p=has?promos[promoIdx%promos.length]:null;
+    const inner=$("promoInner");inner.classList.remove("fade");void inner.offsetWidth;inner.classList.add("fade");
+    $("pvTitle").textContent=p?p.title:"歡迎使用 OSCE 站位計時器";
+    $("pvDetail").textContent=p?(p.detail||""):"活動宣傳會顯示在這裡，可由主控者在「設定」中新增。";
+    $("pvWhen").textContent=p?(p.when||""):"";
+    const d=$("pdots");d.textContent="";
+    if(promos.length>1)promos.forEach((_,i)=>{const e=document.createElement("i");if(i===promoIdx%promos.length)e.className="on";d.appendChild(e);});
+  }
+  setInterval(()=>{if(promos.length>1){promoIdx=(promoIdx+1)%promos.length;renderPromo();}},8000);
+
+  let armed=null;
+  function renderAdmin(){
+    const ul=$("plist");ul.textContent="";
+    if(!promos.length){const li=document.createElement("li");li.textContent="尚未新增宣傳。";ul.appendChild(li);return;}
+    promos.forEach(p=>{
+      const li=document.createElement("li"),s=document.createElement("span"),b=document.createElement("button");
+      s.textContent=p.title+(p.when?"｜"+p.when:"");
+      b.textContent=armed===p.id?"確認刪除":"刪除";if(armed===p.id)b.className="confirm";
+      b.addEventListener("click",async()=>{
+        if(armed!==p.id){armed=p.id;renderAdmin();return;}
+        armed=null;try{await db.doc("promos/"+p.id).delete();}catch(e){$("pErr").textContent="刪除失敗，請再試一次。";}
+      });
+      li.append(s,b);ul.appendChild(li);
+    });
+  }
+  ["pTitle","pDetail","pWhen"].forEach(id=>$(id).addEventListener("input",()=>{$("pErr").textContent="";}));
+  $("btnAddPromo").addEventListener("click",async()=>{
+    const title=$("pTitle").value.trim();
+    if(!title){$("pErr").textContent="請先填寫標題。";$("pTitle").focus();return;}
+    if(!db)return;
+    const btn=$("btnAddPromo");btn.disabled=true;
+    try{
+      await db.collection("promos").add({title:title.slice(0,40),detail:$("pDetail").value.trim().slice(0,80),when:$("pWhen").value.trim().slice(0,30),order:Date.now()});
+      $("pTitle").value=$("pDetail").value=$("pWhen").value="";$("pErr").textContent="已新增，所有裝置會開始輪播。";
+    }catch(e){$("pErr").textContent=e&&e.code==="quota_exceeded"?"宣傳數量已達上限，請先刪除舊的。":"新增失敗，請確認你是主控者後再試。";}
+    btn.disabled=false;
+  });
+
+  /* 連線共享資料 */
+  (async()=>{
+    try{
+      const cl=await new Promise(res=>{let n=0;const t=setInterval(()=>{if(window.claude&&window.claude.use){clearInterval(t);res(window.claude);}else if(++n>30){clearInterval(t);res(null);}},100);});
+      if(!cl)standalone=true;
+      const [d,u]=cl?await Promise.all([cl.use("db"),cl.use("user")]):[null,null];
+      db=d||null;
+      canWrite=!!(db&&u&&await u.canEdit());
+      if(db){
+        sessRef=db.doc("live/session");
+        sessRef.onSnapshot(snap=>{
+          const v=snap.exists?snap.data():null;
+          remoteS=v&&v.runId?clean({...v}):null;
+          if(remoteS){Object.assign(remoteS,{state:v.state,endAt:v.endAt,remainMs:v.remainMs,runId:v.runId});}
+          if(view!=="solo"){draw();}
+        },()=>{setSync("同步連線中斷，請重新整理頁面。");});
+        db.collection("promos").orderBy("order").limit(20).onSnapshot(qs=>{
+          promos=qs.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.title);
+          if(promoIdx>=promos.length)promoIdx=0;renderPromo();renderAdmin();
+        },()=>{});
+      }
+    }catch(e){db=null;canWrite=false;}
+    dbReady=true;applyView();
+  })();
+
+  renderPromo();applyView();
+  setInterval(draw,200);
+})();
+</script>
+</body>
+</html>
